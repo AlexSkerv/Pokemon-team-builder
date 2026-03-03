@@ -1,0 +1,360 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Pokémon Team Builder</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      max-width: 900px;
+      margin: 20px auto;
+      padding: 0 16px;
+      background-color: #f5f5f5;
+    }
+
+    h1 {
+      text-align: center;
+      color: #cc0000;
+    }
+
+    .layout {
+      display: flex;
+      gap: 24px;
+      align-items: flex-start;
+    }
+
+    /* ── Left Panel ── */
+    .search-panel {
+      flex: 0 0 320px;
+      background: white;
+      border: 2px solid #ccc;
+      border-radius: 8px;
+      padding: 16px;
+    }
+
+    .search-panel h2 {
+      margin-top: 0;
+      font-size: 16px;
+    }
+
+    .search-row {
+      display: flex;
+      gap: 8px;
+      margin-bottom: 12px;
+    }
+
+    .search-row input {
+      flex: 1;
+      padding: 6px 8px;
+      font-size: 14px;
+      border: 1px solid #aaa;
+      border-radius: 4px;
+    }
+
+    button {
+      padding: 6px 14px;
+      font-size: 14px;
+      background-color: #cc0000;
+      color: white;
+      border: none;
+      border-radius: 4px;
+      cursor: pointer;
+    }
+
+    button:hover {
+      background-color: #aa0000;
+    }
+
+    #pokemon-display {
+      text-align: center;
+      min-height: 160px;
+    }
+
+    #pokemon-display img {
+      width: 120px;
+      height: 120px;
+      object-fit: contain;
+    }
+
+    #pokemon-display h3 {
+      text-transform: capitalize;
+      margin: 4px 0;
+    }
+
+    audio {
+      width: 100%;
+      margin: 8px 0;
+    }
+
+    .moves-section {
+      margin-top: 12px;
+    }
+
+    .moves-section > label {
+      font-size: 13px;
+      font-weight: bold;
+    }
+
+    .moves-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 8px;
+      margin-top: 6px;
+    }
+
+    .move-slot {
+      display: flex;
+      flex-direction: column;
+      gap: 2px;
+      font-size: 13px;
+    }
+
+    .move-slot select {
+      padding: 4px;
+      font-size: 13px;
+      border: 1px solid #aaa;
+      border-radius: 4px;
+    }
+
+    #add-btn {
+      width: 100%;
+      margin-top: 12px;
+      background-color: #1a56cc;
+    }
+
+    #add-btn:hover {
+      background-color: #1440aa;
+    }
+
+    #error-msg {
+      color: red;
+      font-size: 13px;
+      display: none;
+      margin-bottom: 8px;
+    }
+
+    #loading {
+      text-align: center;
+      display: none;
+      padding: 20px;
+      color: #666;
+    }
+
+    /* ── Right Panel ── */
+    .team-panel {
+      flex: 1;
+      background: white;
+      border: 2px solid #ccc;
+      border-radius: 8px;
+      padding: 16px;
+    }
+
+    .team-panel h2 {
+      margin-top: 0;
+      font-size: 16px;
+    }
+
+    #team-list p {
+      color: #888;
+      font-size: 13px;
+    }
+
+    .team-entry {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      border: 1px solid #ddd;
+      border-radius: 6px;
+      padding: 8px;
+      margin-bottom: 8px;
+    }
+
+    .team-entry img {
+      width: 56px;
+      height: 56px;
+      object-fit: contain;
+    }
+
+    .team-entry h3 {
+      margin: 0 0 4px;
+      font-size: 14px;
+      text-transform: capitalize;
+    }
+
+    .team-entry ul {
+      margin: 0;
+      padding-left: 18px;
+      font-size: 13px;
+      text-transform: capitalize;
+    }
+  </style>
+</head>
+<body>
+
+  <h1>Pokémon Team Builder</h1>
+
+  <div class="layout">
+
+    <!-- Left: Search -->
+    <div class="search-panel">
+      <h2>Find a Pokémon</h2>
+      <div class="search-row">
+        <input type="text" id="pokemon-input" placeholder="Name or ID (e.g. 25)" />
+        <button id="find-btn">Find</button>
+      </div>
+
+      <div id="error-msg">Pokémon not found. Try another name or ID.</div>
+      <div id="loading">Loading...</div>
+
+      <div id="pokemon-display"></div>
+
+      <audio id="pokemon-cry" controls style="display:none;"></audio>
+
+      <div class="moves-section" id="moves-section" style="display:none;">
+        <label>Select Moves:</label>
+        <div class="moves-grid">
+          <div class="move-slot"><label>Move 1</label><select id="move1"></select></div>
+          <div class="move-slot"><label>Move 2</label><select id="move2"></select></div>
+          <div class="move-slot"><label>Move 3</label><select id="move3"></select></div>
+          <div class="move-slot"><label>Move 4</label><select id="move4"></select></div>
+        </div>
+        <button id="add-btn">Add to Team</button>
+      </div>
+    </div>
+
+    <!-- Right: Team -->
+    <div class="team-panel">
+      <h2>My Team (<span id="team-count">0</span> / 6)</h2>
+      <div id="team-list">
+        <p>No Pokémon added yet.</p>
+      </div>
+    </div>
+
+  </div>
+
+  <script>
+    const cache = {};
+    let currentPokemon = null;
+
+    const input        = document.getElementById('pokemon-input');
+    const findBtn      = document.getElementById('find-btn');
+    const loading      = document.getElementById('loading');
+    const display      = document.getElementById('pokemon-display');
+    const errorMsg     = document.getElementById('error-msg');
+    const cryAudio     = document.getElementById('pokemon-cry');
+    const movesSection = document.getElementById('moves-section');
+    const addBtn       = document.getElementById('add-btn');
+    const teamList     = document.getElementById('team-list');
+    const teamCount    = document.getElementById('team-count');
+    const moveSelects  = [1, 2, 3, 4].map(i => document.getElementById('move' + i));
+
+    let team = [];
+
+    async function fetchPokemon(nameOrId) {
+      const key = String(nameOrId).toLowerCase().trim();
+      if (cache[key]) return cache[key];
+      const res = await fetch(`https://pokeapi.co/api/v2/pokemon/${key}`);
+      if (!res.ok) throw new Error('Not found');
+      const data = await res.json();
+      cache[key] = data;
+      return data;
+    }
+
+    function populateMoves(moves) {
+      const names = moves.map(m => m.move.name);
+      moveSelects.forEach((sel, i) => {
+        sel.innerHTML = '';
+        names.forEach(n => {
+          const opt = document.createElement('option');
+          opt.value = n;
+          opt.textContent = n;
+          sel.appendChild(opt);
+        });
+        if (names[i]) sel.value = names[i];
+      });
+    }
+
+    function showPokemon(data) {
+      const imgUrl = data.sprites.other?.['official-artwork']?.front_default
+                  || data.sprites.front_default;
+      const cryUrl = data.cries?.latest || data.cries?.legacy || null;
+
+      display.innerHTML = `
+        <img src="${imgUrl}" alt="${data.name}" />
+        <h3>#${data.id} — ${data.name}</h3>
+      `;
+
+      if (cryUrl) {
+        cryAudio.src = cryUrl;
+        cryAudio.style.display = 'block';
+      } else {
+        cryAudio.style.display = 'none';
+      }
+
+      populateMoves(data.moves);
+      movesSection.style.display = 'block';
+      currentPokemon = data;
+    }
+
+    async function handleFind() {
+      const val = input.value.trim();
+      if (!val) return;
+
+      errorMsg.style.display = 'none';
+      display.innerHTML = '';
+      cryAudio.style.display = 'none';
+      movesSection.style.display = 'none';
+      loading.style.display = 'block';
+
+      try {
+        const data = await fetchPokemon(val);
+        loading.style.display = 'none';
+        showPokemon(data);
+      } catch (e) {
+        loading.style.display = 'none';
+        errorMsg.style.display = 'block';
+        currentPokemon = null;
+      }
+    }
+
+    findBtn.addEventListener('click', handleFind);
+    input.addEventListener('keydown', e => { if (e.key === 'Enter') handleFind(); });
+
+    addBtn.addEventListener('click', () => {
+      if (!currentPokemon) return;
+      if (team.length >= 6) {
+        alert('Your team is full! (max 6 Pokémon)');
+        return;
+      }
+
+      const moves = moveSelects.map(s => s.value);
+      const imgUrl = currentPokemon.sprites.other?.['official-artwork']?.front_default
+                   || currentPokemon.sprites.front_default;
+
+      team.push({ name: currentPokemon.name, id: currentPokemon.id, imgUrl, moves });
+      renderTeam();
+    });
+
+    function renderTeam() {
+      teamCount.textContent = team.length;
+      if (team.length === 0) {
+        teamList.innerHTML = '<p>No Pokémon added yet.</p>';
+        return;
+      }
+      teamList.innerHTML = team.map(p => `
+        <div class="team-entry">
+          <img src="${p.imgUrl}" alt="${p.name}" />
+          <div>
+            <h3>#${p.id} ${p.name}</h3>
+            <ul>
+              ${p.moves.map(m => `<li>${m}</li>`).join('')}
+            </ul>
+          </div>
+        </div>
+      `).join('');
+    }
+  </script>
+
+</body>
+</html>
